@@ -37,3 +37,17 @@ These are generic patterns that typically fail or cause problems. Do not retry w
 14. **Running `git checkout` on files modified by others**: If the working tree has uncommitted changes in files you didn't modify, `git checkout` will destroy them. Always check `git status` before reverting, and only revert files you actually changed.
 
 15. **Declaring plateau too early**: 1 wave with 0 KEEP is not a plateau. Try at least 2 consecutive waves, then apply plateau recovery strategies before stopping.
+
+## Benchmark Anti-Patterns
+
+The benchmark is the foundation — if it's wrong, the entire loop is invalid.
+
+16. **No fixed random seed**: The primary metric varies between identical runs. This makes every KEEP/DISCARD decision unreliable. Always seed the RNG in the benchmark, not just in the optimizer.
+
+17. **Benchmarking the wrong function**: Wrapping `main()` which calls the optimizer indirection but not the actual optimization path. The benchmark must exercise the exact code path that will be modified.
+
+18. **Primary metric too noisy**: If the metric varies by more than 1% between identical runs, the 2% KEEP threshold is meaningless. Increase benchmark duration, reduce external noise, or fix the optimizer's convergence.
+
+19. **Generated benchmark not sanity-checked**: If the LLM generated the benchmark, running it once and trusting the result. Always run 3 times and verify the primary metric agrees within 0.5%.
+
+20. **Hardcoding parameters in the benchmark**: If `benchmark.jl` sets `fwhm_max=1.0` directly, changing `src/core.jl` has no effect. The benchmark must import the parameter from the source file being optimized.

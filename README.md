@@ -69,7 +69,9 @@ That's it. Phase 0 auto-creates the rest:
 
 ## Writing a benchmark script
 
-This is the only file you need to create. Here's howto write one that works well with the optimization loop.
+> **The benchmark is the foundation of the entire optimization loop.** Every KEEP/DISCARD decision depends on it. If the benchmark doesn't exercise the right pipeline, uses the wrong metric, or is non-deterministic, the optimizer will converge to garbage. Invest time here.
+
+This is the only file you need to create. Here's how to write one that works well with the optimization loop.
 
 ### Required format
 
@@ -143,6 +145,34 @@ print(json.dumps({
     "success": True, "r2": result.r2
 }))
 ```
+
+### Bad benchmark checklist
+
+These flaws will poison the optimization loop. Before trusting results, verify none of these apply:
+
+| Red flag | Why it breaks the loop |
+|----------|------------------------|
+| No fixed seed | Primary metric varies between runs -> KEEP/DISCARD becomes random |
+| Runs unit tests instead of the optimizer | Measures test pass rate, not optimization quality -> meaningless delta |
+| Times the wrong code path | Benchmark says "improved 20%" but the optimizer is unchanged |
+| Primary metric = `success` boolean | No gradation — can't detect 1% improvements |
+| JSON line is pretty-printed or wrapped | `METRIC_JSON` extraction fails -> crash |
+| Uses environment variables for data path | Unreliable across sessions -> baseline can't be reproduced |
+| Runs once, takes a median internally | Prevents external warmup/multi-run protocol |
+| Exits non-zero on optimization failure | Should output `{"success":false,...}` instead -> crash vs DISCARD |
+| Hardcodes parameter values that will be changed | Parameter is hardcoded in benchmark -> changing source has no effect |
+
+### Sanity check
+
+Before starting any experiment wave, run this manual check:
+
+```bash
+# Run benchmark twice with no code changes
+bash scripts/run_bench.sh sanity-1 benchmark/baseline.json
+bash scripts/run_bench.sh sanity-2 benchmark/baseline.json
+```
+
+Both must produce the **same primary metric within 0.5%**. If they don't, the benchmark is non-deterministic and needs fixing.
 
 ## Installation
 
