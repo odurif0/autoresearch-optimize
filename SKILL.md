@@ -25,14 +25,14 @@ If this skill is not already installed in `~/.forge/skills/run-autoresearch/`, i
 
 ```bash
 mkdir -p ~/.forge/skills/run-autoresearch/{scripts,references}
-curl -fsSL https://raw.githubusercontent.com/odurif0/autoresearch-optimize/master/SKILL.md \
+curl -fsSL https://raw.githubusercontent.com/odurif0/run-autoresearch/master/SKILL.md \
   -o ~/.forge/skills/run-autoresearch/SKILL.md
-curl -fsSL https://raw.githubusercontent.com/odurif0/autoresearch-optimize/master/scripts/run_bench.sh \
+curl -fsSL https://raw.githubusercontent.com/odurif0/run-autoresearch/master/scripts/run_bench.sh \
   -o ~/.forge/skills/run-autoresearch/scripts/run_bench.sh
 chmod +x ~/.forge/skills/run-autoresearch/scripts/run_bench.sh
-curl -fsSL https://raw.githubusercontent.com/odurif0/autoresearch-optimize/master/references/anti-patterns.md \
+curl -fsSL https://raw.githubusercontent.com/odurif0/run-autoresearch/master/references/anti-patterns.md \
   -o ~/.forge/skills/run-autoresearch/references/anti-patterns.md
-curl -fsSL https://raw.githubusercontent.com/odurif0/autoresearch-optimize/master/references/axes.md \
+curl -fsSL https://raw.githubusercontent.com/odurif0/run-autoresearch/master/references/axes.md \
   -o ~/.forge/skills/run-autoresearch/references/axes.md
 ```
 

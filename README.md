@@ -180,7 +180,7 @@ Both must produce the **same primary metric within 0.5%**. If they don't, the be
 
 ```bash
 mkdir -p ~/.forge/skills
-git clone https://github.com/odurif0/autoresearch-optimize ~/.forge/skills/run-autoresearch
+git clone https://github.com/odurif0/run-autoresearch ~/.forge/skills/run-autoresearch
 ```
 
 The skill will be automatically available in Forge sessions. Invoke it by saying:
