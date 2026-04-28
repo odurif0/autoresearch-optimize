@@ -45,9 +45,9 @@ Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch) an
 
 ## Prerequisites
 
-Your project only needs one thing — everything else is auto-configured on first run:
+No manual setup required — Phase 0 auto-configures everything on first run:
 
-**A benchmark script** (`benchmark/benchmark.{jl,py,R,rs,cpp,...}`) that outputs:
+**Benchmark script** (`benchmark/benchmark.{jl,py,R,rs,cpp,...}`) — either user-provided or LLM-generated during Phase 0. Must output:
 
 ```
 METRIC_JSON
@@ -56,9 +56,9 @@ METRIC_JSON
 
 The JSON must contain at minimum: `success` (bool) and the primary metric.
 
-**Don't have one? The LLM can generate it.** When Phase 0 detects a missing benchmark, it reads your project source code, identifies the main pipeline and metric, and writes `benchmark/benchmark.{ext}` for you — just validate it before running experiments.
+**If the benchmark is missing, Phase 0 generates it** by reading your project source code — just validate the result before experiments begin.
 
-That's it. Phase 0 auto-creates the rest:
+Phase 0 auto-creates everything else:
 
 | File | Action |
 |------|--------|
@@ -69,9 +69,9 @@ That's it. Phase 0 auto-creates the rest:
 
 ## Writing a benchmark script
 
-> **The benchmark is the foundation of the entire optimization loop.** Every KEEP/DISCARD decision depends on it. If the benchmark doesn't exercise the right pipeline, uses the wrong metric, or is non-deterministic, the optimizer will converge to garbage. Invest time here.
+> **The benchmark is the foundation of the entire optimization loop.** Every KEEP/DISCARD decision depends on it. If the benchmark doesn't exercise the right pipeline, uses the wrong metric, or is non-deterministic, the optimizer will converge to garbage. Whether you write it yourself or let the LLM generate it, validate it carefully.
 
-This is the only file you need to create. Here's how to write one that works well with the optimization loop.
+Here's what a good benchmark looks like:
 
 ### Required format
 

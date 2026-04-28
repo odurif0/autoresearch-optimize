@@ -19,35 +19,6 @@ This skill implements key strategies from the autoresearch community:
 - **Structured experiment log**: append-only TSV for reliable resume and analysis across sessions
 - **Baseline warmup protocol**: ensure baseline and experiments are measured under identical conditions
 
-## Prerequisites
-
-The project needs these files to exist. **Phase 0 will create them automatically if missing:**
-
-1. **Benchmark script** (`benchmark/benchmark.{jl,py,R,rs,cpp,...}`) that outputs a `METRIC_JSON` marker followed by a JSON line:
-   ```
-   METRIC_JSON
-   {"primary":-2825.5,"time_s":11.84,"success":true,...}
-   ```
-   The JSON must contain at minimum: `success` (bool) and the primary metric.
-   **This is the single most critical component.** If the benchmark is non-deterministic, exercises the wrong code path, or uses the wrong metric, every KEEP/DISCARD decision is invalid.
-   If the benchmark script is missing, the agent will generate one during Phase 0 (by reading the project source) — but the user must validate it before experiments begin. See Phase 0 Step 1 and Step 5 (sanity check).
-
-2. **Evaluate script** (`benchmark/evaluate.sh`) that compares benchmark output to a baseline:
-   ```bash
-   ./benchmark/evaluate.sh benchmark/baseline.json /tmp/result.txt
-   # Exit 0 = KEEP, Exit 1 = DISCARD, Exit 2 = ERROR
-   ```
-   If missing, Phase 0 will **generate a default** `evaluate.sh` that implements the standard decision logic (primary metric > 2% or time > 15%).
-
-3. **Baseline file** (`benchmark/baseline.json`) with the current best metrics.
-   If missing, Phase 0 will **create it automatically** by running the benchmark.
-
-4. **Clean git state** -- all changes committed, no dirty working tree.
-   If dirty, Phase 0 will **report the conflict** and ask the user to resolve before proceeding.
-
-5. **`benchmark/` directory**.
-   If missing, Phase 0 will **create it**.
-
 ## Runtime Profiles
 
 The skill adapts its measurement strategy based on the runtime profile of the language/toolchain. **The profile is auto-detected from the benchmark script extension, but can be overridden.**
@@ -147,7 +118,7 @@ The `run_bench.sh` script handles this automatically -- it applies the same warm
 
 This phase **automatically sets up** any missing prerequisites, then reads the project context.
 
-**Step 0: Detect and setup prerequisites**
+**Step 0: Auto-setup**
 
 1. **Detect benchmark script**: scan for `benchmark/benchmark.{jl,py,R,rs,cpp,c,go,f90,rb,m,java,cs}` or a `Makefile` with a `benchmark:` target.
    - If found: detect language and runtime profile automatically.
@@ -157,7 +128,7 @@ This phase **automatically sets up** any missing prerequisites, then reads the p
      - What the primary metric is (scan for accuracy, loss, BIC, r2, etc.)
      - What parameters will be optimized
      
-     Then write `benchmark/benchmark.{ext}` following the format in Prerequisites. The agent must follow these rules:
+     Then write `benchmark/benchmark.{ext}`. The required format:
      - Wrap the project's main function in a timing block
      - Use a fixed seed for reproducibility
      - Output `METRIC_JSON` followed by a single-line JSON with `success`, `time_s`, and the primary metric
