@@ -45,21 +45,25 @@ Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch) an
 
 ## Prerequisites
 
-Your project needs:
+Your project only needs one thing — everything else is auto-configured on first run:
 
-1. **Benchmark script** (`benchmark/benchmark.{jl,py,R,rs,cpp,...}`) that outputs:
-   ```
-   METRIC_JSON
-   {"primary":-2825.5,"time_s":11.84,"success":true,...}
-   ```
+**A benchmark script** (`benchmark/benchmark.{jl,py,R,rs,cpp,...}`) that outputs:
 
-2. **Evaluate script** (`benchmark/evaluate.sh`) that compares against baseline:
-   ```bash
-   ./benchmark/evaluate.sh benchmark/baseline.json /tmp/result.txt
-   # Exit 0 = KEEP, Exit 1 = DISCARD, Exit 2 = ERROR
-   ```
+```
+METRIC_JSON
+{"primary":-2825.5,"time_s":11.84,"success":true,...}
+```
 
-3. **Baseline file** (`benchmark/baseline.json`) with current best metrics.
+The JSON must contain at minimum: `success` (bool) and the primary metric.
+
+That's it. Phase 0 auto-creates the rest:
+
+| File | Action |
+|------|--------|
+| `benchmark/` dir | Created if missing |
+| `benchmark/evaluate.sh` | Generated with default KEEP/DISCARD logic |
+| `benchmark/baseline.json` | Created by running the benchmark |
+| `benchmark/experiments.tsv` | Created on first experiment log |
 
 ## Installation
 
