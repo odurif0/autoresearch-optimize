@@ -21,29 +21,31 @@ This skill implements key strategies from the autoresearch community:
 
 ## Prerequisites
 
-Before starting, verify the project has:
+The project needs these files to exist. **Phase 0 will create them automatically if missing:**
 
-1. **Benchmark script** that outputs a `METRIC_JSON` marker followed by a JSON line:
+1. **Benchmark script** (`benchmark/benchmark.{jl,py,R,rs,cpp,...}`) that outputs a `METRIC_JSON` marker followed by a JSON line:
    ```
    METRIC_JSON
    {"primary":-2825.5,"time_s":11.84,"success":true,...}
    ```
    The JSON must contain at minimum: `success` (bool) and the primary metric.
+   This file is **project-specific and must already exist** -- the skill cannot generate it.
 
-2. **Evaluate script** that compares benchmark output to a baseline:
+2. **Evaluate script** (`benchmark/evaluate.sh`) that compares benchmark output to a baseline:
    ```bash
    ./benchmark/evaluate.sh benchmark/baseline.json /tmp/result.txt
    # Exit 0 = KEEP, Exit 1 = DISCARD, Exit 2 = ERROR
    ```
+   If missing, Phase 0 will **generate a default** `evaluate.sh` that implements the standard decision logic (primary metric > 2% or time > 15%).
 
 3. **Baseline file** (`benchmark/baseline.json`) with the current best metrics.
+   If missing, Phase 0 will **create it automatically** by running the benchmark.
 
 4. **Clean git state** -- all changes committed, no dirty working tree.
+   If dirty, Phase 0 will **report the conflict** and ask the user to resolve before proceeding.
 
-If the baseline file is missing, create it using the benchmark helper script:
-```bash
-bash ~/.forge/skills/autoresearch-optimize/scripts/run_bench.sh init-baseline benchmark/baseline.json
-```
+5. **`benchmark/` directory**.
+   If missing, Phase 0 will **create it**.
 
 ## Runtime Profiles
 
@@ -140,7 +142,62 @@ The `run_bench.sh` script handles this automatically -- it applies the same warm
 
 ## Workflow
 
-### Phase 0: Read Project Context
+### Phase 0: Setup & Read Project Context
+
+This phase **automatically sets up** any missing prerequisites, then reads the project context.
+
+**Step 0: Detect and setup prerequisites**
+
+1. **Detect benchmark script**: scan for `benchmark/benchmark.{jl,py,R,rs,cpp,c,go,f90,rb,m,java,cs}` or a `Makefile` with a `benchmark:` target.
+   - If found: detect language and runtime profile automatically.
+   - If NOT found: **STOP**. The benchmark script is project-specific and must be provided by the user. Tell the user what format is expected (see Prerequisites).
+
+2. **Create `benchmark/` directory** if it doesn't exist: `mkdir -p benchmark`
+
+3. **Generate `benchmark/evaluate.sh`** if it doesn't exist. Write a default evaluate script:
+   ```bash
+   #!/usr/bin/env bash
+   # evaluate.sh — Compare benchmark result to baseline.
+   # Exit 0 = KEEP, 1 = DISCARD, 2 = ERROR
+   set -euo pipefail
+   BASELINE="${1:?}"
+   RESULT="${2:?}"
+   # Extract metrics from result
+   METRICS=$(awk '/^METRIC_JSON$/{getline; print; exit}' "$RESULT")
+   if [ -z "$METRICS" ]; then echo "ERROR: no METRIC_JSON"; exit 2; fi
+   SUCCESS=$(echo "$METRICS" | sed -n 's/.*"success":[[:space:]]*\(true\|false\).*/\1/p')
+   if [ "$SUCCESS" = "false" ]; then echo "DISCARD: success=false"; exit 1; fi
+   # Extract primary metric (first numeric field after "primary" or "bic")
+   B_NEW=$(echo "$METRICS" | sed -n 's/.*"\(bic\|primary\)":[[:space:]]*\([-0-9.]*\).*/\2/p')
+   B_OLD=$(cat "$BASELINE" | sed -n 's/.*"\(bic\|primary\)":[[:space:]]*\([-0-9.]*\).*/\2/p')
+   T_NEW=$(echo "$METRICS" | sed -n 's/.*"time_s":[[:space:]]*\([-0-9.]*\).*/\1/p')
+   T_OLD=$(cat "$BASELINE" | sed -n 's/.*"time_s":[[:space:]]*\([-0-9.]*\).*/\1/p')
+   # Decision logic: primary improved >2% OR primary stable ±2% AND time improved >15%
+   B_DELTA=$(echo "scale=4; ($B_NEW - $B_OLD) / ($B_OLD != 0 ? $B_OLD : 1) * 100" | bc)
+   T_DELTA=$(echo "scale=4; ($T_NEW - $T_OLD) / ($T_OLD != 0 ? $T_OLD : 1) * 100" | bc)
+   # For metrics where lower is better (e.g., BIC, error), negate delta
+   IS_LOWER_BETTER=$(echo "$B_OLD < 0" | bc)
+   if [ "$IS_LOWER_BETTER" = "1" ]; then B_DELTA=$(echo "-$B_DELTA" | bc); fi
+   echo "Primary delta: ${B_DELTA}%  |  Time delta: ${T_DELTA}%"
+   if [ "$(echo "$B_DELTA < -2" | bc)" = "1" ]; then echo "KEEP: primary improved >2%"; exit 0; fi
+   if [ "$(echo "$B_DELTA > -2 && $B_DELTA < 2" | bc)" = "1" ] && [ "$(echo "$T_DELTA < -15" | bc)" = "1" ]; then
+     echo "KEEP: primary stable, time improved >15%"; exit 0
+   fi
+   echo "DISCARD"; exit 1
+   ```
+   Then `chmod +x benchmark/evaluate.sh`.
+
+4. **Create `benchmark/baseline.json`** if it doesn't exist:
+   ```bash
+   bash ~/.forge/skills/autoresearch-optimize/scripts/run_bench.sh init-baseline benchmark/baseline.json
+   ```
+   This runs the benchmark with the correct warmup protocol and saves the result.
+
+5. **Verify git state**: run `git status --short`.
+   - If clean: proceed.
+   - If dirty: **STOP and report**. List the dirty files and ask the user to commit or stash before proceeding. Do NOT `git checkout` any files.
+
+**Step 1: Read project context**
 
 1. Read `program.md` if it exists -- it defines the optimization axes and constraints.
 2. Read `autoresearch_log.md` if it exists -- it contains history of previous experiments.

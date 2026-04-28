@@ -10,8 +10,9 @@ Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch) an
 
 ```
 ┌─────────────────────────────────────────────┐
-│  Phase 0: Read project context              │
-│  (program.md, baseline, source, history)    │
+│  Phase 0: Setup & Read project context      │
+│  Auto-create baseline, evaluate.sh, TSV     │
+│  Read program.md, source, history           │
 ├─────────────────────────────────────────────┤
 │  Phase 1: Plan wave (failure-driven)        │
 │  6-10 experiments, prioritized by leverage  │
@@ -66,7 +67,7 @@ Your project needs:
 
 ```bash
 mkdir -p ~/.forge/skills
-git clone https://github.com/durif/autoresearch-optimize ~/.forge/skills/autoresearch-optimize
+git clone https://github.com/odurif0/autoresearch-optimize ~/.forge/skills/autoresearch-optimize
 ```
 
 The skill will be automatically available in Forge sessions. Invoke it by saying:
