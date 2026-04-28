@@ -150,7 +150,19 @@ This phase **automatically sets up** any missing prerequisites, then reads the p
 
 1. **Detect benchmark script**: scan for `benchmark/benchmark.{jl,py,R,rs,cpp,c,go,f90,rb,m,java,cs}` or a `Makefile` with a `benchmark:` target.
    - If found: detect language and runtime profile automatically.
-   - If NOT found: **STOP**. The benchmark script is project-specific and must be provided by the user. Tell the user what format is expected (see Prerequisites).
+   - If NOT found: **the agent should generate one** by reading the project source code to understand:
+     - The main entry point (function call, pipeline, optimizer)
+     - What data file to use (look for test/sample data)
+     - What the primary metric is (scan for accuracy, loss, BIC, r2, etc.)
+     - What parameters will be optimized
+     
+     Then write `benchmark/benchmark.{ext}` following the format in Prerequisites. The agent must follow these rules:
+     - Wrap the project's main function in a timing block
+     - Use a fixed seed for reproducibility
+     - Output `METRIC_JSON` followed by a single-line JSON with `success`, `time_s`, and the primary metric
+     - If the project already has test infrastructure, route around it — the benchmark must exercise the full optimization pipeline, not just unit tests
+     
+     **After generating, ask the user to validate** before proceeding: show the generated script and confirm it exercises the right code path and metric. Do NOT run experiments until the user confirms.
 
 2. **Create `benchmark/` directory** if it doesn't exist: `mkdir -p benchmark`
 

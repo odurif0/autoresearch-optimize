@@ -56,6 +56,8 @@ METRIC_JSON
 
 The JSON must contain at minimum: `success` (bool) and the primary metric.
 
+**Don't have one? The LLM can generate it.** When Phase 0 detects a missing benchmark, it reads your project source code, identifies the main pipeline and metric, and writes `benchmark/benchmark.{ext}` for you — just validate it before running experiments.
+
 That's it. Phase 0 auto-creates the rest:
 
 | File | Action |
