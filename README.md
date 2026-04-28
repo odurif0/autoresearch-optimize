@@ -39,9 +39,9 @@ Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch) an
 - **Runtime profile awareness** -- adapts measurement strategy per language (warmup for JIT, multi-run for stochastic, single-run for compiled)
 - **Variance-aware acceptance** -- confirmation runs for marginal improvements, prevents false KEEP from noise
 - **Structured experiment log** -- append-only TSV for reliable session resume and pattern analysis
-- **Plateau recovery** -- 5 escalation strategies before declaring a true optimum
+- **Plateau recovery** -- 6 escalation strategies before declaring a true optimum, starting with methodological reset
 - **15 anti-patterns** -- catalog of changes that typically fail, to avoid wasting benchmark runs
-- **18 exploration axes** -- generic dimensions organized by expected leverage (algorithmic > constraints > hyperparameters > micro-optimizations)
+- **Project-specific exploration axes** -- agent scans source code to identify tunable parameters AND methodological improvement opportunities (objective reformulation, pipeline restructuring, new heuristics); builds a concrete axis list with proposals at METHODOLOGICAL / HIGH / MEDIUM / LOW impact levels. `references/axes.md` serves as an inspiration checklist of axis *categories*
 
 ## Prerequisites
 
@@ -239,7 +239,7 @@ run-autoresearch/
 │   └── run_bench.sh          # Benchmark runner with profile detection
 └── references/
     ├── anti-patterns.md      # 15 generic anti-patterns to avoid
-    └── axes.md               # 18 exploration axes by leverage level
+    └── axes.md               # Axis categories reference (checklist for building project-specific axes)
 ```
 
 ## Acknowledgments

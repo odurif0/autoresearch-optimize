@@ -1,11 +1,13 @@
 ---
 name: run-autoresearch
 description: >
-  Autonomous parameter/code optimization loop for any project with a benchmark
-  and evaluation script. Use when the user asks to run autoresearch, optimize
-  parameters, tune a model, run experiments, or improve performance metrics
+  Autonomous optimization loop for any project with a benchmark and evaluation
+  script. Use when the user asks to run autoresearch, optimize parameters,
+  improve code, tune a model, run experiments, or improve performance metrics
   (BIC, accuracy, latency, etc.) through systematic trial-and-error with
-  automatic KEEP/DISCARD decisions. Also use when the user wants to resume a
+  automatic KEEP/DISCARD decisions. Supports both numeric hyperparameter tuning
+  and methodological improvements (objective reformulation, pipeline
+  restructuring, algorithmic changes). Also use when the user wants to resume a
   previous optimization session or plan a new wave of experiments.
 ---
 
@@ -215,32 +217,81 @@ This phase **automatically sets up** any missing prerequisites, then reads the p
 1. Read `program.md` if it exists -- it defines the optimization axes and constraints.
 2. Read `autoresearch_log.md` if it exists -- it contains history of previous experiments.
 3. Read `benchmark/experiments.tsv` if it exists -- structured log of all experiments.
-4. Read the main source file to understand current parameter values.
+4. Read the main source file to understand current parameter values, algorithm choices, and structural assumptions (the same code you'll mine for methodological axes in step 7).
 5. Read `benchmark/baseline.json` to know the current baseline metrics.
 6. **Detect runtime profile** from benchmark script extension (see Runtime Profiles).
-7. **Failure analysis**: If previous experiments exist, identify patterns:
+7. **Define project-specific exploration axes**: Think like a researcher, not a hyperparameter tuner. Scan the source code and identify every tunable parameter, algorithm choice, and — critically — every *structural assumption* that could be changed to improve results. For each, define a concrete axis with specific proposals. The output must be a structured table, not prose. Use `todo_write` to track these axes.
+
+   **How to build the axis list**:
+
+   **Step A — Extract numeric/choice parameters** (tuning axes):
+   - Scan all source files for numeric literals, named constants, algorithm selections, and configuration dicts/structs.
+   - For each, propose 2-4 concrete test values (e.g., `fwhm_max: 1.0 → [0.7, 0.85, 1.2, 1.5]`).
+   - Classify impact: `HIGH` (solver choice, constraint bounds), `MEDIUM` (tolerances, iteration counts), `LOW` (micro opts).
+
+   **Step B — Identify methodological/algorithmic improvements** (research axes):
+   - Read the code with a critical eye: what assumptions does it make? What could be done differently?
+   - Look for: the objective function formulation, the model structure, the pipeline architecture, initialization strategy, heuristics, preprocessing steps, mathematical approximations.
+   - For each potential improvement, describe a *concrete code change proposal* (not just a concept). These are still single changes, just not simple numeric substitutions.
+   - Classify impact: `METHODOLOGICAL` (always explore these before numeric tuning).
+   - Examples of methodological axes:
+     - *Objective function*: add a regularization term, switch from BIC to AIC, add a sparsity penalty
+     - *Model structure*: add a term for an unmodeled physical phenomenon, allow asymmetric components
+     - *Pipeline architecture*: add a preprocessing/filtering step, split optimization into coarse→fine stages
+     - *Initialization*: replace random init with data-driven seeding (k-means++, PCA-informed, grid-based)
+     - *Heuristics*: adaptive stopping criteria, dynamic tolerance scheduling, intelligent bounds narrowing
+     - *Mathematical reformulation*: change the parameterization (log-space, relative coordinates), use a different decomposition
+
+   **Step C — Validate against constraints**:
+   - If `program.md` exists, use it to identify which parameters/approaches are in scope and which are forbidden.
+   - Cross-reference the axis list with `references/anti-patterns.md` to remove ideas that are known to fail.
+
+   **Example output** (including methodological axes):
+   ```
+   | # | Axis | Param/Change | Current | Proposal | Impact | Rationale |
+   |---|------|-------------|---------|----------|--------|-----------|
+   | 1 | Objective regularization | `cost_function` | Pure BIC | Add L2 penalty on amplitudes | METHODOLOGICAL | Reduces overfitting on noisy data; common in model selection |
+   | 2 | Coarse→fine pipeline | optimization flow | Single-stage | Split: coarse grid search → local refinement | METHODOLOGICAL | Grid pre-search avoids local minima, then refine best candidates |
+   | 3 | Initialization strategy | `init_centers()` | Random uniform | K-means++ seeding | METHODOLOGICAL | Better initial spread reduces convergence iterations |
+   | 4 | Global optimizer | `algorithm` | `:DIRECT_L` | `[:MLSL, :CRS2_LM]` | HIGH | MLSL often finds better optima on multi-modal landscapes |
+   | 5 | FWHM max bound | `fwhm_max` | `1.0` | `[0.7, 0.85, 1.2, 1.5]` | HIGH | Wider bounds allow fitting broader features |
+   | 6 | Convergence tol | `ftol_rel` | `1e-8` | `[1e-6, 1e-10, 1e-12]` | MEDIUM | Tighter tol may improve BIC, looser may save time |
+   | 7 | Max iterations | `max_iter` | `1000` | `[300, 600, 2000]` | MEDIUM | Reducing may speed up without quality loss |
+   ```
+
+   **Important**:
+   - All axes must be grounded in the actual project code and problem domain. Do NOT invent axes that have no connection to the codebase.
+   - Methodological axes (Step B) require understanding the *problem*, not just the *code*. Read the project documentation, comments, and any associated papers to identify domain-specific improvement opportunities.
+   - Methodological axes don't have simple numeric test values — the "Proposal" column describes the code change in one sentence, and the agent implements it during Phase 2 as a targeted edit (still following the "one change per experiment" rule).
+   - [references/axes.md](references/axes.md) serves as a checklist of axis *categories* (both tuning and methodological) you may have overlooked — use it to verify completeness.
+
+8. **Failure analysis**: If previous experiments exist, identify patterns:
    - Which parameters have been tried and failed? (avoid repeating)
    - What was the closest to KEEP? (fine-tune around that value)
    - Are there systematic weaknesses? (e.g., always losing on time, or metric plateau)
-
+   - Cross-reference: remove from the axis list any parameter/value combination already tried and DISCARDed (see `benchmark/experiments.tsv`). Mark as priority those that were close to KEEP.
 ### Phase 1: Plan Wave (Failure-Driven)
 
 Plan a wave of 6-10 experiments. **The first 2-3 experiments should target the most promising changes based on failure analysis of previous waves.**
 
-Prioritize by expected leverage:
-1. **HIGH**: Algorithm/solver changes
-2. **HIGH**: Constraint/bounds parameters
+Prioritize by expected leverage using the project-specific axis list from Phase 0:
+1. **METHODOLOGICAL**: Objective reformulation, model structure changes, pipeline restructuring, new heuristics, mathematical reformulation. These have the highest potential impact because they change *what* is being optimized, not just *how fast*.
+2. **HIGH**: Algorithm/solver replacement, constraint/bounds changes
 3. **MEDIUM**: Hyperparameters (tolerances, iteration counts)
 4. **LOW**: Micro-optimizations (vectorization, compiler flags)
 
-**Failure-driven planning strategy:**
-- If previous wave had experiments that were close to KEEP (within 1% of threshold), prioritize fine-tuning those parameters.
-- If all experiments in the previous wave degraded the primary metric, the parameter space is likely at a local optimum -- try algorithmic changes instead.
-- If experiments degraded time but not quality, explore speed-focused changes (fewer iterations, looser tolerance, faster algorithm).
-- Consult `references/anti-patterns.md` to avoid repeating known-bad changes.
-- See [references/axes.md](references/axes.md) for a catalog of specific exploration dimensions organized by expected effect level.
+**Plan experiments from the axis list**: each experiment maps to one axis and one proposal/test value. For tuning axes, an axis with 3 test values produces up to 3 experiments. For methodological axes, each proposal is one experiment that requires a code change (not a simple value substitution — implement the described approach, respecting the "one change per experiment" rule). Select the most promising proposals first — you don't have to try all of them in one wave.
 
-For each planned experiment, record the parameter name, current value, proposed value, and rationale.
+**Wave composition**: every wave should include at least 1-2 methodological experiments. Do not spend an entire wave on numeric tuning if methodological improvements remain unexplored.
+
+**Failure-driven planning strategy:**
+- If previous wave had experiments that were close to KEEP (within 1% of threshold), prioritize fine-tuning around that parameter's test values (add intermediate values if needed).
+- If all experiments in the previous wave degraded the primary metric, the parameter space is likely at a local optimum — prioritize methodological changes (reformulate, restructure) instead of more parameter tweaking.
+- If experiments degraded time but not quality, explore speed-focused methodological axes (coarse→fine pipeline, adaptive stopping, faster algorithm) before numeric tuning.
+- Cross-reference the axis list with `references/anti-patterns.md` to avoid repeating known-bad changes. Remove axes that match anti-patterns.
+- [references/axes.md](references/axes.md) provides generic inspiration for axis *categories* you may have overlooked — use it as a checklist to verify your project-specific axis list is comprehensive, not as a replacement for it.
+
+For each planned experiment, record: the axis number (from the project-specific list), parameter/change name, current state, proposed change, and rationale. For methodological experiments, the "proposed change" is a one-sentence description of the code modification to implement.
 
 Use `todo_write` to track each experiment with status.
 
@@ -248,7 +299,7 @@ Use `todo_write` to track each experiment with status.
 
 For each experiment in the wave:
 
-1. **Apply change** -- modify exactly one parameter/algorithm in the source file.
+1. **Apply change** -- implement exactly one change. For tuning axes: modify one parameter/algorithm value. For methodological axes: implement the code change described in the axis proposal (e.g., add a regularization term, split the pipeline into two stages, replace random init with k-means++). Always keep the change minimal and targeted — even a methodological change should be a single coherent modification.
 2. **Verify compilation** -- run a syntax check appropriate for the language:
    - Julia: `include("src/Module.jl")`
    - Python: `python -c "import module"`
@@ -285,11 +336,12 @@ After all experiments in a wave:
 
 When 2 consecutive waves produce 0 KEEP, do NOT immediately stop. Try these recovery strategies in order:
 
-1. **Algorithmic reset**: switch to a fundamentally different optimizer algorithm.
-2. **Constraint relaxation/expansion**: widen or narrow bounds by 20-30% on the most impactful constraint parameter.
-3. **Interaction exploration**: test combinations of 2 parameters that were individually close to KEEP (breaking the "one change" rule intentionally, with justification).
-4. **Data-driven**: analyze residuals/errors to identify systematic patterns that suggest missing model features.
-5. **Declare true plateau**: if recovery also fails after 1 wave, the optimum is genuinely reached. Stop and document.
+1. **Methodological reset** (strongest): return to Step B of axis building. Re-examine the code for structural assumptions you haven't challenged yet. Propose at least 2 new methodological experiments — reformulate the objective, restructure the pipeline, or change the model itself. This is the most powerful lever when numeric tuning has plateaued.
+2. **Algorithmic reset**: switch to a fundamentally different optimizer algorithm (or try one from the axis list not yet tested).
+3. **Constraint relaxation/expansion**: widen or narrow bounds by 20-30% on the most impactful constraint parameter.
+4. **Interaction exploration**: test combinations of 2 parameters that were individually close to KEEP (breaking the "one change" rule intentionally, with justification).
+5. **Data-driven**: analyze residuals/errors to identify systematic patterns that suggest missing model features — this feeds back into Step B for a new methodological axis.
+6. **Declare true plateau**: if methodological + algorithmic recovery also fails after 1 wave, the optimum is genuinely reached. Stop and document.
 
 ## Experiment Log Format
 
@@ -302,14 +354,17 @@ Columns:
 exp_id	timestamp	parameter	old_value	new_value	primary_delta	time_delta	metric2	metric3	metric4	verdict	commit_hash	runtime_profile
 ```
 
+For tuning experiments: `parameter` = parameter name, `old_value`/`new_value` = before/after values.
+For methodological experiments: `parameter` = axis description (e.g., "add L2 regularization"), `old_value`/`new_value` = "baseline"/"implemented".
+
 This file enables:
 - Quick resume: `tail -20 benchmark/experiments.tsv` shows recent experiments
-- Pattern analysis: `cut -f4,11 experiments.tsv | sort | uniq -c` shows which parameters are most often KEPT
-- Failure analysis: `awk '$11=="DISCARD"' experiments.tsv | cut -f4 | sort | uniq -c` shows which parameters always fail
+- Pattern analysis: `cut -f3,11 experiments.tsv | sort | uniq -c` shows which parameters/axes are most often KEPT
+- Failure analysis: `awk '$11=="DISCARD"' experiments.tsv | cut -f3 | sort | uniq -c` shows which parameters/axes always fail
 
 ## Critical Rules
 
-- **One change per experiment.** Never batch multiple parameter changes (except during plateau recovery, strategy 3).
+- **One change per experiment.** Never batch multiple changes — whether parameter tuning, algorithm swap, or methodological restructuring (except during plateau recovery strategy 4).
 - **Never modify files outside the optimization target.** If the project defines a scope, respect it.
 - **Never `git checkout` files you didn't modify.** This destroys uncommitted work by others.
 - **Always verify compilation** before running the benchmark.
@@ -339,4 +394,5 @@ To resume a previous optimization session:
 4. Read `benchmark/baseline.json` for the current baseline.
 5. Verify git is clean.
 6. Detect runtime profile from benchmark script.
-7. Plan and execute a new wave, prioritizing failure-driven insights.
+7. **Rebuild the project-specific axis list** (Phase 0, Step 1, item 7): re-scan the source code for both tuning parameters and methodological opportunities. The code may have changed since the last session (KEPT experiments modified it). Cross-reference against the experiment history to remove already-tried combinations.
+8. Plan and execute a new wave, prioritizing failure-driven insights and unexplored methodological axes.

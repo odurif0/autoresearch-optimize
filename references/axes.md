@@ -1,6 +1,62 @@
-# Exploration Axes
+# Exploration Axes (Reference / Inspiration)
 
-Generic dimensions to explore when planning optimization experiments. Not all axes apply to every project -- select the ones relevant to the current optimization target.
+> **This document is a checklist of axis *categories*, not a prescriptive catalog.** Before planning any experiment, you MUST scan the actual project source code and build a project-specific axis list with concrete parameter names, current values, and proposed test values. Use this document only to verify you haven't overlooked a category of tunable parameters.
+
+Generic dimension *types* to consider when exploring a codebase for optimization opportunities. Each section describes a category of parameters you might find in the source code, why they matter, and how to define concrete test values once you locate them.
+
+## Methodological Innovations (Highest Leverage)
+
+These change *what* is being optimized, not just *how fast*. They require understanding the problem domain, not just the code. Each axis describes a structural change to the approach itself — implement as a targeted code modification, not a numeric substitution.
+
+### Objective Function Reformulation
+
+A. **Add regularization**: L1 (sparsity), L2 (shrinkage), or elastic net penalty on model parameters. Reduces overfitting, especially with noisy data or many parameters.
+
+B. **Switch information criterion**: BIC → AIC (lighter penalty, more complex models) or AICc (small-sample correction). Changes the bias-variance trade-off fundamentally.
+
+C. **Add domain-specific penalty**: Physics constraints, smoothness penalties, monotonicity constraints. Encodes prior knowledge into the objective.
+
+D. **Multi-objective formulation**: Optimize quality and speed simultaneously (Pareto front) instead of a single weighted metric.
+
+### Model Structure Changes
+
+E. **Add unmodeled phenomena**: If the model assumes symmetry but the data is asymmetric, add asymmetry parameters. If background is assumed constant, make it spatially varying.
+
+F. **Change component/feature type**: Gaussian → Lorentzian/Voigt for spectroscopy, linear → spline for trends, fixed → adaptive basis functions.
+
+G. **Hierarchical/multi-scale modeling**: Model coarse structure first, then fine details. Effective when features exist at multiple scales.
+
+### Pipeline Architecture
+
+H. **Coarse→fine optimization**: Grid search or random sampling to find promising regions, then local refinement on the top N candidates. Reduces risk of local minima.
+
+I. **Preprocessing/filtering step**: Denoise, detrend, or normalize data before optimization. Can make the optimization landscape smoother.
+
+J. **Sequential/iterative fitting**: Fit components one at a time, subtract, fit next (matching pursuit). Alternative to fitting all components simultaneously.
+
+K. **Ensemble strategy**: Run multiple optimizers with different settings, keep the best result. Costs more time but more robust.
+
+### Initialization & Seeding
+
+L. **Data-driven initialization**: K-means++, PCA-informed, or peak-detection-based starting points instead of random. Better initial positions → faster convergence + better optima.
+
+M. **Multi-start with pruning**: Run N short optimizations from different starts, keep only the top K for full refinement. Balances exploration vs cost.
+
+### Heuristics & Adaptive Strategies
+
+N. **Adaptive tolerance**: Start with loose tolerance, tighten as optimization progresses. Saves time in early iterations when far from optimum.
+
+O. **Dynamic bounds narrowing**: After a coarse pass, narrow the search bounds around promising regions for the fine pass.
+
+P. **Early stopping with validation**: Hold out a validation subset, stop when validation metric degrades (not just training convergence).
+
+### Mathematical Reformulation
+
+Q. **Change parameterization**: Log-space for positive parameters, logit-space for [0,1] bounds, relative coordinates instead of absolute. Can make the landscape more convex.
+
+R. **Different decomposition**: SVD/PCA pre-processing, wavelet decomposition, Fourier basis instead of direct parameter fitting.
+
+S. **Analytical gradient/Jacobian**: If the optimizer uses finite differences, providing an analytical gradient can dramatically improve speed and accuracy.
 
 ## High Leverage: Algorithm/Solver Changes
 
@@ -66,17 +122,26 @@ These control the search space geometry.
 
 When planning experiments, use this priority order based on what previous waves revealed:
 
+**First wave or resumed session**:
+- ALWAYS start with 1-2 methodological experiments (axes A-S above, translated to project-specific proposals)
+- Then fill the rest of the wave with HIGH-impact tuning experiments
+
 **If quality is the bottleneck** (primary metric far from theoretical optimum):
-- Start with axes 1-3 (algorithmic changes)
-- Then axes 4-7 (constraint changes)
-- Then axes 13-15 (model selection)
+- Start with methodological axes A-G (objective, model structure, pipeline)
+- Then methodological axes L-M (initialization)
+- Then HIGH axes (algorithm changes, constraint changes)
+- Then MEDIUM axes related to model selection
 
 **If speed is the bottleneck** (quality is good but time is too high):
-- Start with axes 8-12 (hyperparameters)
-- Then axes 1-3 (try faster algorithms)
-- Then axes 16-18 (micro-optimizations)
+- Start with methodological axes H-K (pipeline architecture, coarse→fine, ensemble)
+- Then methodological axes N-P (heuristics, adaptive strategies)
+- Then HIGH axes (try faster algorithms)
+- Then MEDIUM axes (hyperparameters: tolerances, iteration limits)
+- Then LOW axes (micro-optimizations) only as last resort
 
 **If both are stuck** (plateau on quality AND speed):
-- Try axes 3 (multi-start) and 7 (asymmetric constraints) -- these break symmetry
+- Try methodological axes A-D (reformulate objective) — this is the most powerful lever
+- Try methodological axes Q-S (mathematical reformulation)
+- Try multi-start strategies (methodological axis M)
 - Try combining 2 parameters that were individually close to KEEP (plateau recovery)
-- Try a fundamentally different approach (e.g., reformulate the objective function)
+- Try a fundamentally different approach: read recent papers, look for novel methods in the problem domain
